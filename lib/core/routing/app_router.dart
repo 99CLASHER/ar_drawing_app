@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 
 import '../constants/app_strings.dart';
 import '../theme/app_theme.dart';
+import '../../features/image_picker/presentation/screens/home_screen.dart';
+import '../../features/image_picker/presentation/screens/image_picker_screen.dart';
+import '../../features/camera_overlay/presentation/screens/camera_overlay_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
 
 // Placeholder routes - will be updated as we implement features
 class AppRoutes {
@@ -10,6 +14,11 @@ class AppRoutes {
   static const String imagePicker = '/image-picker';
   static const String cameraOverlay = '/camera-overlay';
   static const String settings = '/settings';
+  
+  // Helper method to create camera overlay route with image path
+  static String cameraOverlayWithImage(String imagePath) {
+    return '$cameraOverlay?imagePath=${Uri.encodeComponent(imagePath)}';
+  }
 }
 
 class AppRouter {
@@ -30,7 +39,10 @@ class AppRouter {
       GoRoute(
         path: AppRoutes.cameraOverlay,
         name: AppRoutes.cameraOverlay,
-        builder: (context, state) => const CameraOverlayScreen(),
+        builder: (context, state) {
+          final imagePath = state.uri.queryParameters['imagePath'];
+          return CameraOverlayScreen(imagePath: imagePath);
+        },
       ),
       GoRoute(
         path: AppRoutes.settings,
@@ -42,70 +54,6 @@ class AppRouter {
   );
 }
 
-// Placeholder screens - will be implemented in respective feature modules
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.appTitle),
-      ),
-      body: const Center(
-        child: Text('Home Screen - Coming Soon'),
-      ),
-    );
-  }
-}
-
-class ImagePickerScreen extends StatelessWidget {
-  const ImagePickerScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.selectImage),
-      ),
-      body: const Center(
-        child: Text('Image Picker Screen - Coming Soon'),
-      ),
-    );
-  }
-}
-
-class CameraOverlayScreen extends StatelessWidget {
-  const CameraOverlayScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.startDrawing),
-      ),
-      body: const Center(
-        child: Text('Camera Overlay Screen - Coming Soon'),
-      ),
-    );
-  }
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(AppStrings.settings),
-      ),
-      body: const Center(
-        child: Text('Settings Screen - Coming Soon'),
-      ),
-    );
-  }
-}
 
 class ErrorScreen extends StatelessWidget {
   final Exception? error;

@@ -39,6 +39,10 @@ class StorageFailure extends Failure {
   const StorageFailure(super.message, {super.code});
 }
 
+class CacheFailure extends Failure {
+  const CacheFailure(super.message, {super.code});
+}
+
 class UnknownFailure extends Failure {
   const UnknownFailure(super.message, {super.code});
 }

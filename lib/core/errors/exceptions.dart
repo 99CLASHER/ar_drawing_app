@@ -27,3 +27,7 @@ class NetworkException extends AppException {
 class StorageException extends AppException {
   const StorageException(super.message, {super.code});
 }
+
+class CacheException extends AppException {
+  const CacheException(super.message, {super.code});
+}
