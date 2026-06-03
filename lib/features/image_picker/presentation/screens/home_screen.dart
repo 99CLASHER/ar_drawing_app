@@ -389,7 +389,7 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildStartDrawingButton(BuildContext context, ImageEntity? selectedImage) {
     return ElevatedButton(
       onPressed: selectedImage != null
-          ? () => _navigateToCameraOverlay(context)
+          ? () => _navigateToCameraOverlay(context, selectedImage)
           : null,
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.primaryColor,
@@ -415,7 +415,14 @@ class HomeScreen extends ConsumerWidget {
     });
   }
 
-  void _navigateToCameraOverlay(BuildContext context) {
-    context.go(AppRoutes.cameraOverlay);
+  void _navigateToCameraOverlay(BuildContext context, ImageEntity? selectedImage) {
+    if (selectedImage != null) {
+      context.go(
+        AppRoutes.cameraOverlay,
+        extra: {'imagePath': selectedImage.path},
+      );
+    } else {
+      context.go(AppRoutes.cameraOverlay);
+    }
   }
 }

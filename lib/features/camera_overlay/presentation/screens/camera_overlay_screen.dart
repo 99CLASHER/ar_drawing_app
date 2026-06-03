@@ -23,12 +23,44 @@ class _CameraOverlayScreenState extends ConsumerState<CameraOverlayScreen>
   CameraController? _cameraController;
   bool _isCameraInitialized = false;
   String? _errorMessage;
+  bool _isInitialized = false; // guard: only run overlay init once
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Guard: only initialize once.
+    // didChangeDependencies fires again whenever GoRouterState (or any
+    // InheritedWidget) changes — including when a bottom sheet opens/closes.
+    // Without this guard, every sheet dismissal resets the overlay to defaults.
+    if (_isInitialized) return;
+    _isInitialized = true;
+
+    // Read navigation arguments for image path (safe to access context here)
+    final args = GoRouterState.of(context).extra as Map<String, dynamic>?;
+    final imagePathFromArgs = args?['imagePath'] as String?;
+
+    // Initialize overlay provider and set image path if provided
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (mounted) {
+        // Initialize the overlay provider first
+        await ref.read(cameraOverlayProvider.notifier).init();
+
+        // Then set the overlay if image path is provided
+        if (imagePathFromArgs != null) {
+          _initializeOverlay(imagePathFromArgs);
+        } else if (widget.imagePath != null) {
+          _initializeOverlay(widget.imagePath!);
+        }
+      }
+    });
   }
 
   @override
@@ -165,12 +197,16 @@ class _CameraOverlayScreenState extends ConsumerState<CameraOverlayScreen>
               child: _buildCameraPlaceholder(),
             ),
 
-          // Overlay Image
-          if (_isCameraInitialized && 
-              overlayState.overlay != null && 
-              overlayState.overlay!.isVisible)
-            Positioned.fill(
-              child: _buildOverlayImage(overlayState.overlay!),
+          // Overlay Image — wrapped in Consumer for direct, granular updates
+          if (_isCameraInitialized)
+            Consumer(
+              builder: (context, ref, _) {
+                final overlay = ref.watch(cameraOverlayProvider).overlay;
+                if (overlay == null || !overlay.isVisible) return const SizedBox.shrink();
+                return Positioned.fill(
+                  child: _buildOverlayImage(overlay),
+                );
+              },
             ),
 
           // Control Panel
@@ -403,69 +439,68 @@ class _CameraOverlayScreenState extends ConsumerState<CameraOverlayScreen>
   void _showOpacitySlider(CameraOverlayState overlayState) {
     if (overlayState.overlay == null) return;
 
-    double currentOpacity = overlayState.overlay!.opacity;
-    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.black,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Adjust Opacity',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            StatefulBuilder(
-              builder: (context, setState) => Column(
-                children: [
-                  Slider(
-                    value: currentOpacity,
-                    min: 0.0,
-                    max: 1.0,
-                    divisions: 10,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white.withValues(alpha: 0.3),
-                    onChanged: (value) {
-                      setState(() => currentOpacity = value);
-                    },
-                  ),
-                  Text(
-                    '${(currentOpacity * 100).toInt()}%',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
+      barrierColor: Colors.black38,
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final opacity =
+              ref.watch(cameraOverlayProvider).overlay?.opacity ??
+              overlayState.overlay!.opacity;
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.read(cameraOverlayProvider.notifier).updateOpacity(currentOpacity);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                const Text(
+                  'Adjust Opacity',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: const Text('Apply'),
+                ),
+                const SizedBox(height: 20),
+                Slider(
+                  value: opacity,
+                  min: 0.0,
+                  max: 1.0,
+                  divisions: 100,
+                  activeColor: Colors.white,
+                  inactiveColor: Colors.white.withValues(alpha: 0.3),
+                  onChanged: (value) {
+                    ref
+                        .read(cameraOverlayProvider.notifier)
+                        .updateOpacityInMemory(value);
+                  },
+                ),
+                Text(
+                  '${(opacity * 100).toInt()}%',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ref
+                          .read(cameraOverlayProvider.notifier)
+                          .updateOpacity(opacity);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Done'),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -473,69 +508,68 @@ class _CameraOverlayScreenState extends ConsumerState<CameraOverlayScreen>
   void _showScaleSlider(CameraOverlayState overlayState) {
     if (overlayState.overlay == null) return;
 
-    double currentScale = overlayState.overlay!.scale;
-    
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.black,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Adjust Scale',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 20),
-            StatefulBuilder(
-              builder: (context, setState) => Column(
-                children: [
-                  Slider(
-                    value: currentScale,
-                    min: 0.1,
-                    max: 3.0,
-                    divisions: 29,
-                    activeColor: Colors.white,
-                    inactiveColor: Colors.white.withValues(alpha: 0.3),
-                    onChanged: (value) {
-                      setState(() => currentScale = value);
-                    },
-                  ),
-                  Text(
-                    '${(currentScale * 100).toInt()}%',
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
+      barrierColor: Colors.black38,
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final scale =
+              ref.watch(cameraOverlayProvider).overlay?.scale ??
+              overlayState.overlay!.scale;
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                const Spacer(),
-                ElevatedButton(
-                  onPressed: () {
-                    ref.read(cameraOverlayProvider.notifier).updateScale(currentScale);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                const Text(
+                  'Adjust Scale',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
                   ),
-                  child: const Text('Apply'),
+                ),
+                const SizedBox(height: 20),
+                Slider(
+                  value: scale,
+                  min: 0.5,
+                  max: 3.0,
+                  divisions: 50,
+                  activeColor: Colors.white,
+                  inactiveColor: Colors.white.withValues(alpha: 0.3),
+                  onChanged: (value) {
+                    ref
+                        .read(cameraOverlayProvider.notifier)
+                        .updateScaleInMemory(value);
+                  },
+                ),
+                Text(
+                  '${(scale * 100).toInt()}%',
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ref
+                          .read(cameraOverlayProvider.notifier)
+                          .updateScale(scale);
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                    ),
+                    child: const Text('Done'),
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

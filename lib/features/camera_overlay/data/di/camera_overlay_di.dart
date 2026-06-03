@@ -6,6 +6,7 @@ import '../../domain/usecases/get_overlay_state_usecase.dart';
 import '../../domain/usecases/update_overlay_opacity_usecase.dart';
 import '../../domain/usecases/update_overlay_scale_usecase.dart';
 import '../../domain/usecases/toggle_overlay_visibility_usecase.dart';
+import '../../domain/usecases/save_overlay_usecase.dart';
 
 Future<void> initializeCameraOverlayDependencies(GetIt sl) async {
   // Register data source
@@ -33,5 +34,8 @@ Future<void> initializeCameraOverlayDependencies(GetIt sl) async {
 
   sl.registerLazySingleton<ToggleOverlayVisibilityUseCase>(
     () => ToggleOverlayVisibilityUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveOverlayUseCase>(
+    () => SaveOverlayUseCase(sl()),
   );
 }
